@@ -105,23 +105,22 @@ start_mqtt() {
         done
     ) &
 
-    # Camera snapshot pipeline (optional): keep one RTSP session warm with
-    # ffmpeg writing a snapshot, and publish it to the image topic ~1 fps.
+    # Camera snapshot pipeline (optional). Uses go2rtc's own snapshot endpoint
+    # (http://.../api/frame.jpeg) rather than an RTSP loopback — go2rtc's RTSP
+    # path can be unreliable for this device while its internal/WebRTC path is
+    # solid. A lightweight MJPEG consumer keeps the stream warm so each
+    # snapshot is instant (and avoids reconnecting to the feeder every poll).
     if bashio::var.true "${MQTT_CAMERA}"; then
-        (
-            while true; do
-                ffmpeg -nostdin -loglevel error -rtsp_transport tcp \
-                    -i "rtsp://127.0.0.1:8554/${STREAM}" \
-                    -vf fps=2 -q:v 6 -update 1 -y /tmp/snap.jpg 2>/dev/null
-                sleep 5
-            done
-        ) &
-        (
-            while true; do
-                [ -f /tmp/snap.jpg ] && mosquitto_pub "${MQ[@]}" -t "${BASE}/image" -f /tmp/snap.jpg 2>/dev/null || true
-                sleep 1
-            done
-        ) &
+        ( while true; do
+            curl -s -N -m 3600 "http://127.0.0.1:1984/api/stream.mjpeg?src=${STREAM}" >/dev/null 2>&1 || true
+            sleep 2
+          done ) &
+        ( while true; do
+            if curl -sf -m 10 -o /tmp/snap.jpg "http://127.0.0.1:1984/api/frame.jpeg?src=${STREAM}"; then
+                mosquitto_pub "${MQ[@]}" -t "${BASE}/image" -f /tmp/snap.jpg 2>/dev/null || true
+            fi
+            sleep 2
+          done ) &
     fi
 }
 
