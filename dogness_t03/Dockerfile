@@ -9,6 +9,9 @@ ARG BUILD_ARCH
 # compile (installs in seconds). Built from ./overlay applied to upstream
 # go2rtc @ 7c05066c90ab6ad1fccb506d5f0408aa31ebe60f (v1.9.15); rebuild with
 # ./scripts/build.sh.
+# ffmpeg lets go2rtc produce JPEG snapshots (camera still images) and MJPEG.
+RUN apk add --no-cache ffmpeg
+
 COPY bin/go2rtc-${BUILD_ARCH} /usr/bin/go2rtc
 RUN chmod a+x /usr/bin/go2rtc
 
