@@ -1,0 +1,35 @@
+name: Dogness Treater (T03)
+version: "1.0.0"
+slug: dogness_t03
+description: Live camera feed + treat dispensing for Dogness TUTK cameras (Smart Cam Treater T03 / T1020). Pure Go, LAN-direct, no cloud streaming.
+url: "https://github.com/matthewratcliffe/ha-dogness-t03"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+startup: application
+boot: auto
+host_network: true
+ports:
+  "1984/tcp": 1984
+  "8554/tcp": 8554
+  "8555/tcp": 8555
+  "8555/udp": 8555
+ports_description:
+  "1984/tcp": "go2rtc web UI / API / treat endpoint"
+  "8554/tcp": "RTSP"
+  "8555/tcp": "WebRTC (TCP)"
+  "8555/udp": "WebRTC (UDP)"
+options:
+  username: ""
+  password: ""
+  timezone: 0
+  stream: "treater"
+  log_level: "info"
+schema:
+  username: "str"
+  password: "password"
+  timezone: "int(-12,14)"
+  stream: "str?"
+  log_level: "list(trace|debug|info|warn|error)?"

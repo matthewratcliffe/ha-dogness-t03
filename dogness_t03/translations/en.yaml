@@ -1,0 +1,16 @@
+configuration:
+  username:
+    name: Dogness account email
+    description: The email you use to log in to the Dogness app.
+  password:
+    name: Dogness account password
+    description: Your Dogness app password. Used once at startup to fetch the feeder's UID and device key; video and treats then run entirely on your LAN.
+  timezone:
+    name: Timezone offset (hours)
+    description: Hours from UTC, e.g. 11 for Sydney (AEDT), -5 for New York (EST). Leave 0 to auto-detect.
+  stream:
+    name: Camera stream name
+    description: The go2rtc stream name used for the camera entity (e.g. "treater").
+  log_level:
+    name: Log level
+    description: go2rtc log verbosity. Use "debug" when troubleshooting.

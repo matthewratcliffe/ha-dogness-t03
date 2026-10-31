@@ -1,0 +1,6 @@
+# build artifacts / local test files
+*.exe
+*.h264
+*.jpg
+*.log
+go2rtc
