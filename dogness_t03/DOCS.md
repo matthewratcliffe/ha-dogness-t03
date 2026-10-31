@@ -9,12 +9,31 @@ username: you@example.com   # Dogness app email
 password: yourpassword      # Dogness app password
 timezone: 11                # UTC offset in hours; 0 = auto-detect
 stream: treater             # go2rtc stream name for the camera
+mqtt_camera: true           # publish the snapshot camera over MQTT
 log_level: info             # trace | debug | info | warn | error
 ```
 
 Only `username` and `password` are required. The add-on logs in once, reads your feeder's
 UID + device key from the Dogness device list, discovers its LAN IP, and registers a camera
 stream automatically.
+
+## Ready-made entities (MQTT)
+
+If the **Mosquitto broker** add-on (the `mqtt` service) is available, the add-on publishes
+Home Assistant **MQTT discovery** messages so a device **Dogness Treater** appears
+automatically with:
+
+- `camera.dog_treater` — a snapshot camera (~1–2 fps) pushed over MQTT.
+- `button.treat` — press to dispense a treat.
+
+No YAML or manual integration is needed; add them to a dashboard by picking them from the
+entity list. Set `mqtt_camera: false` to publish only the button (and avoid keeping a video
+session open continuously for snapshots). For full-rate HD video, add a **Generic Camera**
+pointing at `rtsp://<HA_IP>:8554/<stream>`.
+
+MQTT topics used: `homeassistant/button/dogness_<stream>/config`,
+`homeassistant/camera/dogness_<stream>/config`, command `dogness/<stream>/treat/set`,
+image `dogness/<stream>/image`, availability `dogness/<stream>/status`.
 
 ## Ports
 

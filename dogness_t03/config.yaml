@@ -1,5 +1,5 @@
 name: Dogness Treater (T03)
-version: "1.0.2"
+version: "1.1.0"
 slug: dogness_t03
 description: Live camera feed + treat dispensing for Dogness TUTK cameras (Smart Cam Treater T03 / T1020). Pure Go, LAN-direct, no cloud streaming.
 url: "https://github.com/matthewratcliffe/ha-dogness-t03"
@@ -11,6 +11,8 @@ init: false
 startup: application
 boot: auto
 host_network: true
+services:
+  - mqtt:want
 ports:
   "1984/tcp": 1984
   "8554/tcp": 8554
@@ -26,10 +28,12 @@ options:
   password: ""
   timezone: 0
   stream: "treater"
+  mqtt_camera: true
   log_level: "info"
 schema:
   username: "str"
   password: "password"
   timezone: "int(-12,14)"
   stream: "str?"
+  mqtt_camera: "bool?"
   log_level: "list(trace|debug|info|warn|error)?"

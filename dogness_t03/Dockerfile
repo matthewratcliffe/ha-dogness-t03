@@ -9,8 +9,9 @@ ARG BUILD_ARCH
 # compile (installs in seconds). Built from ./overlay applied to upstream
 # go2rtc @ 7c05066c90ab6ad1fccb506d5f0408aa31ebe60f (v1.9.15); rebuild with
 # ./scripts/build.sh.
-# ffmpeg lets go2rtc produce JPEG snapshots (camera still images) and MJPEG.
-RUN apk add --no-cache ffmpeg
+# ffmpeg: JPEG snapshots for the MQTT camera. mosquitto-clients + curl: MQTT
+# discovery so the camera + treat button appear in HA automatically.
+RUN apk add --no-cache ffmpeg mosquitto-clients curl
 
 COPY bin/go2rtc-${BUILD_ARCH} /usr/bin/go2rtc
 RUN chmod a+x /usr/bin/go2rtc

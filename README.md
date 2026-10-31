@@ -56,6 +56,11 @@ On the **Configuration** tab:
 | `password` | your Dogness app password |
 | `timezone` | your UTC offset in hours (e.g. `11` for Sydney, `-5` for New York). `0` = auto-detect |
 | `stream` | camera stream name, default `treater` |
+| `mqtt_camera` | publish the snapshot camera over MQTT (default on) |
+
+> For the **ready-made entities** below, also install the **Mosquitto broker** add-on (and the
+> **MQTT** integration). Without MQTT the add-on still serves video + the treat API; you just
+> wire them up with the YAML fallback.
 
 Save, then **Start** the add-on. On the **Log** tab you should see:
 
@@ -73,13 +78,35 @@ and playable in the browser.
 
 ---
 
-## Add the camera to a dashboard
+## Ready-made entities (no YAML)
 
-The add-on uses host networking, so Home Assistant reaches it at **your Home Assistant box's
-own IP address** (the same IP you use to open HA). Replace `HA_IP` below with it
-(e.g. `192.168.1.50`).
+> ✅ **Requires the [Mosquitto broker](https://github.com/home-assistant/addons/tree/master/mosquitto)
+> add-on** (one-click install from the Add-on Store, then add the **MQTT** integration if HA
+> doesn't auto-prompt). With it, the add-on publishes its entities to Home Assistant
+> automatically — no YAML, no manual integration.
 
-Add to `configuration.yaml`:
+Once the add-on is running with MQTT available, a device named **Dogness Treater** appears
+under **Settings → Devices & Services → MQTT**, with two ready-made entities:
+
+| Entity | What it is |
+|---|---|
+| `camera.dog_treater` | the camera feed |
+| `button.treat` | press to dispense a treat |
+
+**Add them to a dashboard by picking them from the list:** edit a dashboard → **+ Add Card**
+→ choose **Picture glance / Picture entity** and pick `camera.dog_treater`, and **Button** and
+pick `button.treat`. No YAML required.
+
+> 📷 **About the camera.** The ready-made camera shows a live snapshot stream (~1–2 fps) over
+> MQTT — perfect for a glanceable dashboard tile and reliable everywhere. For **smooth HD
+> video**, optionally add a **Generic Camera** pointing at the add-on's RTSP (see
+> [below](#optional-hd-live-video)); both can coexist.
+
+### Don't have MQTT? (YAML fallback)
+
+If you'd rather not run a broker, you can wire everything manually. The add-on uses host
+networking, so reach it at **your Home Assistant host's IP** (`HA_IP`, the address you use to
+open HA) or the Supervisor gateway `172.30.32.1`. In `configuration.yaml`:
 
 ```yaml
 camera:
@@ -96,34 +123,14 @@ rest_command:
     timeout: 25
 ```
 
-> Alternative to `HA_IP`: from Home Assistant Core you can also use the Supervisor host
-> gateway `172.30.32.1` (e.g. `rtsp://172.30.32.1:8554/treater`) if you'd rather not hardcode
-> your LAN IP.
+Restart HA; you then have `camera.dog_treater` and the `rest_command.dogness_treat` action to
+put on a dashboard.
 
-Restart Home Assistant (or reload **Generic Camera** / **REST commands**). You now have
-`camera.dog_treater` and the action `rest_command.dogness_treat`.
+### Optional: HD live video
 
-### Dashboard card (camera + treat button)
-
-Add a **Manual** card:
-
-```yaml
-type: vertical-stack
-cards:
-  - type: picture-entity
-    entity: camera.dog_treater
-    camera_view: live
-    show_state: false
-    show_name: false
-  - type: button
-    name: Drop a treat 🦴
-    icon: mdi:bone
-    tap_action:
-      action: perform-action
-      perform_action: rest_command.dogness_treat
-```
-
-Tap the button → a treat drops. 🎉
+The ready-made MQTT camera is snapshot-based. For full-rate H.264, add a **Generic Camera**
+(**Settings → Devices & Services → + Add Integration → Generic Camera**) with **Stream Source
+URL** `rtsp://HA_IP:8554/treater` (RTSP transport `TCP`). This streams on demand via go2rtc.
 
 ---
 
