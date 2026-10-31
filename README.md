@@ -43,8 +43,8 @@ Click **Add**, close, then refresh. A **Dogness T03 Add-ons** section appears.
 
 ### 2. Install the add-on
 
-Open **Dogness Treater (T03) → Install**. The first build compiles go2rtc from source and
-takes a few minutes (longer on a Pi).
+Open **Dogness Treater (T03) → Install**. It installs in seconds — the add-on ships a
+prebuilt, statically-linked go2rtc binary per architecture (no on-device compile).
 
 ### 3. Configure
 
@@ -141,8 +141,14 @@ Tap the button → a treat drops. 🎉
    brief session just to dispense.
 
 See [`dogness_t03/DOCS.md`](dogness_t03/DOCS.md) for ports, multiple feeders, and
-troubleshooting, and [`dogness_t03/overlay/`](dogness_t03/overlay/) for the source added to
-go2rtc.
+troubleshooting. The go2rtc source added for this device lives in
+[`dogness_t03/overlay/`](dogness_t03/overlay/); the shipped binaries in `dogness_t03/bin/` are
+built from it (upstream go2rtc @ `7c05066` + overlay) and are reproducible with
+[`scripts/build.sh`](scripts/build.sh).
+
+📄 **[RESEARCH.md](RESEARCH.md)** — a detailed technical report on the reverse-engineering:
+the TUTK/Kalay protocol, the obfuscation scheme, the authentication and control semantics,
+the cloud provisioning API, LAN discovery, and a security analysis.
 
 ---
 

@@ -1,28 +1,18 @@
 ARG BUILD_FROM
-
-# ---- build stage: compile the patched go2rtc from source ----
-# golang:alpine is multi-arch, so this builds natively for the target board.
-FROM golang:1.27-alpine AS build
-
-RUN apk add --no-cache git
-
-# Upstream go2rtc, pinned to the exact commit this add-on was built against.
-ARG GO2RTC_REF=7c05066c90ab6ad1fccb506d5f0408aa31ebe60f
-RUN git clone https://github.com/AlexxIT/go2rtc /src \
-    && cd /src \
-    && git checkout "${GO2RTC_REF}"
-
-# Overlay: the Dogness source (new files) + small TUTK/main patches.
-COPY overlay/ /src/
-
-WORKDIR /src
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /go2rtc .
-
-# ---- run stage: Home Assistant base image ----
 FROM ${BUILD_FROM}
 
-COPY --from=build /go2rtc /usr/bin/go2rtc
+# BUILD_ARCH is provided by the Home Assistant builder (aarch64|amd64|armv7).
+ARG BUILD_ARCH
+
+# Prebuilt, statically-linked (CGO disabled) pure-Go go2rtc with the Dogness
+# TUTK source + treat API compiled in. No native libraries, no on-device
+# compile (installs in seconds). Built from ./overlay applied to upstream
+# go2rtc @ 7c05066c90ab6ad1fccb506d5f0408aa31ebe60f (v1.9.15); rebuild with
+# ./scripts/build.sh.
+COPY bin/go2rtc-${BUILD_ARCH} /usr/bin/go2rtc
+RUN chmod a+x /usr/bin/go2rtc
+
 COPY run.sh /run.sh
-RUN chmod a+x /run.sh /usr/bin/go2rtc
+RUN chmod a+x /run.sh
 
 CMD [ "/run.sh" ]
