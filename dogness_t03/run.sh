@@ -105,23 +105,28 @@ start_mqtt() {
         done
     ) &
 
-    # Camera snapshot pipeline (optional). One persistent ffmpeg reads go2rtc's
-    # H264 fragmented-MP4 stream over HTTP and writes a JPEG snapshot ~1 fps.
-    # This device's go2rtc RTSP and MJPEG paths are unreliable (RTSP times out
-    # for external consumers; MJPEG fails "codecs not matched" on H264), but the
-    # MP4/WebRTC passthrough path is solid. The single ffmpeg both keeps the
-    # feeder stream warm and produces the snapshots; a second loop publishes
-    # them to the MQTT camera topic.
+    # Camera snapshot pipeline (optional). This device's go2rtc RTSP and MJPEG
+    # paths are unreliable (RTSP times out for external consumers; MJPEG fails
+    # "codecs not matched" on H264), but the MP4/WebRTC passthrough works and
+    # go2rtc's own /api/frame.jpeg returns a fresh frame on demand.
+    #
+    # 1) A persistent ffmpeg consumes the H264 MP4 stream (output discarded) to
+    #    keep the feeder streaming, so frame.jpeg stays warm and instant.
+    # 2) A loop pulls a FRESH frame.jpeg each time and publishes it to the MQTT
+    #    camera topic. (A single ffmpeg writing one file froze after one frame;
+    #    polling frame.jpeg gives a genuinely updating image.)
     if bashio::var.true "${MQTT_CAMERA}"; then
         ( while true; do
             ffmpeg -nostdin -loglevel error \
                 -i "http://127.0.0.1:1984/api/stream.mp4?src=${STREAM}" \
-                -vf fps=1 -q:v 6 -update 1 -y /tmp/snap.jpg 2>/dev/null
+                -f null - 2>/dev/null
             sleep 3
           done ) &
         ( while true; do
-            [ -f /tmp/snap.jpg ] && mosquitto_pub "${MQ[@]}" -t "${BASE}/image" -f /tmp/snap.jpg 2>/dev/null || true
-            sleep 1
+            if curl -sf -m 10 -o /tmp/snap.jpg "http://127.0.0.1:1984/api/frame.jpeg?src=${STREAM}"; then
+                mosquitto_pub "${MQ[@]}" -t "${BASE}/image" -f /tmp/snap.jpg 2>/dev/null || true
+            fi
+            sleep 2
           done ) &
     fi
 }
