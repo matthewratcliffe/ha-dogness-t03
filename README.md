@@ -97,10 +97,10 @@ under **Settings → Devices & Services → MQTT**, with two ready-made entities
 → choose **Picture glance / Picture entity** and pick `camera.dog_treater`, and **Button** and
 pick `button.treat`. No YAML required.
 
-> 📷 **About the camera.** The ready-made camera shows a live snapshot stream (~1–2 fps) over
-> MQTT — perfect for a glanceable dashboard tile and reliable everywhere. For **smooth HD
-> video**, optionally add a **Generic Camera** pointing at the add-on's RTSP (see
-> [below](#optional-hd-live-video)); both can coexist.
+> 📷 **About the camera.** The ready-made MQTT camera shows a live snapshot stream (~1 fps) —
+> perfect for a glanceable tile and reliable everywhere (incl. the mobile app). For **smooth,
+> full-rate live video**, add the bundled **Dogness Live card** ([below](#smooth-live-video-dogness-live-card));
+> both can coexist.
 
 ### Don't have MQTT? (YAML fallback)
 
@@ -126,11 +126,28 @@ rest_command:
 Restart HA; you then have `camera.dog_treater` and the `rest_command.dogness_treat` action to
 put on a dashboard.
 
-### Optional: HD live video
+### Smooth live video (Dogness Live card)
 
-The ready-made MQTT camera is snapshot-based. For full-rate H.264, add a **Generic Camera**
-(**Settings → Devices & Services → + Add Integration → Generic Camera**) with **Stream Source
-URL** `rtsp://HA_IP:8554/treater` (RTSP transport `TCP`). This streams on demand via go2rtc.
+The MQTT camera is snapshot-based. For **smooth, full-rate live video** — including inside the
+**Home Assistant mobile app**, where iframe/Webpage cards don't render — the add-on ships a
+self-contained Lovelace card (`dogness-live`). It plays the go2rtc stream **directly from your
+browser/app** (MSE/WebRTC), so it needs no HACS, no WebRTC integration, and no iframe.
+
+On start, the add-on copies `dogness-card.js` into your HA `www` folder. One-time setup:
+
+1. **Settings → Dashboards → ⋮ → Resources → + Add resource**
+   - URL `/local/dogness-card.js`, Type **JavaScript Module**. Refresh the page afterwards.
+2. Add a **Manual** card:
+
+   ```yaml
+   type: custom:dogness-live
+   url: "http://HA_IP:1984/api/ws?src=treater"   # HA_IP = your HA host's LAN IP
+   mode: "mse,webrtc"
+   ```
+
+> This works when you open HA over **http** on your LAN. Over **https** (e.g. Nabu Casa) the
+> browser blocks the `ws://` connection (mixed content) — use the snapshot camera on mobile in
+> that case, or front go2rtc with an https reverse proxy.
 
 ---
 

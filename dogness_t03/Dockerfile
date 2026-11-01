@@ -16,6 +16,10 @@ RUN apk add --no-cache ffmpeg mosquitto-clients curl
 COPY bin/go2rtc-${BUILD_ARCH} /usr/bin/go2rtc
 RUN chmod a+x /usr/bin/go2rtc
 
+# Bundled self-contained Lovelace card (go2rtc player + wrapper); run.sh copies
+# it into HA's www so it's served at /local/dogness-card.js.
+COPY www/dogness-card.js /opt/dogness-card.js
+
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 

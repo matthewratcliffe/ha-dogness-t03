@@ -1,5 +1,5 @@
 name: Dogness Treater (T03)
-version: "1.1.4"
+version: "1.2.0"
 slug: dogness_t03
 description: Live camera feed + treat dispensing for Dogness TUTK cameras (Smart Cam Treater T03 / T1020). Pure Go, LAN-direct, no cloud streaming.
 url: "https://github.com/matthewratcliffe/ha-dogness-t03"
@@ -13,6 +13,11 @@ boot: auto
 host_network: true
 services:
   - mqtt:want
+# Needed only to install the bundled Lovelace card (dogness-card.js) into
+# <config>/www so HA serves it at /local/dogness-card.js. The add-on writes
+# just that one file.
+map:
+  - homeassistant_config:rw
 ports:
   "1984/tcp": 1984
   "8554/tcp": 8554

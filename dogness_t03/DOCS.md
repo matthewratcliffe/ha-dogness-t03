@@ -27,9 +27,37 @@ automatically with:
 - `button.treat` — press to dispense a treat.
 
 No YAML or manual integration is needed; add them to a dashboard by picking them from the
-entity list. Set `mqtt_camera: false` to publish only the button (and avoid keeping a video
-session open continuously for snapshots). For full-rate HD video, add a **Generic Camera**
-pointing at `rtsp://<HA_IP>:8554/<stream>`.
+entity list. Set `mqtt_camera: false` to publish only the button.
+
+> The MQTT camera is a **snapshot** camera (~1 fps). For smooth, full-rate live video use the
+> bundled **Dogness Live card** below.
+
+## Live video widget (smooth, mobile-friendly)
+
+The add-on ships a self-contained Lovelace card that plays the go2rtc stream **directly in your
+browser/app** (MSE/WebRTC, no iframe, no HACS). It renders inline so it works in the Home
+Assistant mobile app, where iframe/Webpage cards do not.
+
+On start the add-on copies `dogness-card.js` into your HA `www` folder. To use it (one-time):
+
+1. **Settings → Dashboards → ⋮ (top-right) → Resources → + Add resource**
+   - URL: `/local/dogness-card.js`
+   - Type: **JavaScript Module**
+   - (Then refresh the page, or restart HA.)
+2. Add a **Manual** card:
+
+   ```yaml
+   type: custom:dogness-live
+   url: "http://<HA_IP>:1984/api/ws?src=treater"   # <HA_IP> = your HA box's LAN IP
+   mode: "mse,webrtc"
+   ```
+
+   Replace `<HA_IP>` with your Home Assistant host's LAN IP (e.g. `192.168.1.50`). `mode`
+   prefers MSE (most reliable on mobile) and falls back to WebRTC.
+
+> Works when you open HA over **http** on the LAN. If you open HA over **https** (e.g. Nabu
+> Casa), the browser blocks the `ws://` connection to the add-on (mixed content) — in that case
+> use the snapshot camera on mobile, or put go2rtc behind an https reverse proxy.
 
 MQTT topics used: `homeassistant/button/dogness_<stream>/config`,
 `homeassistant/camera/dogness_<stream>/config`, command `dogness/<stream>/treat/set`,

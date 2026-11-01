@@ -25,6 +25,21 @@ fi
 
 bashio::log.info "Dogness Treater starting (tz=${TZCFG}, stream=${STREAM})"
 
+# Install the bundled Lovelace card into HA's www dir so it is served at
+# /local/dogness-card.js (same origin, correct MIME). Only this one file is
+# written. The HA config dir is mounted at /homeassistant (or legacy /config).
+for CFG in /homeassistant /config; do
+    if [ -d "${CFG}" ]; then
+        mkdir -p "${CFG}/www" 2>/dev/null || true
+        if cp -f /opt/dogness-card.js "${CFG}/www/dogness-card.js" 2>/dev/null; then
+            bashio::log.info "Lovelace card installed: ${CFG}/www/dogness-card.js  (resource URL: /local/dogness-card.js)"
+        else
+            bashio::log.warning "Could not write ${CFG}/www/dogness-card.js (card unavailable)"
+        fi
+        break
+    fi
+done
+
 # Detect the host's real LAN IP (we run with host networking) so WebRTC
 # advertises a candidate phones/other clients can actually reach, instead of
 # only the unreachable Docker (172.x) addresses that break mobile playback.
