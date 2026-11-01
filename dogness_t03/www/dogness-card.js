@@ -15,7 +15,7 @@
  * - Customized built-in elements (extends HTMLVideoElement) because Safari
  * - Autoplay for WebRTC in Safari
  */
-class VideoRTC extends HTMLElement {
+export class VideoRTC extends HTMLElement {
     constructor() {
         super();
 
@@ -465,7 +465,7 @@ class VideoRTC extends HTMLElement {
                     }
                 }
 
-                if (!sb.updating && sb.buffered && sb.buffered.length) {
+                if (ms.readyState === 'open' && !sb.updating && sb.buffered && sb.buffered.length) { /* dogness: guard closed MSE */
                     const end = sb.buffered.end(sb.buffered.length - 1);
                     const start = end - 5;
                     const start0 = sb.buffered.start(0);
@@ -477,7 +477,7 @@ class VideoRTC extends HTMLElement {
                         this.video.currentTime = start;
                     }
                     const gap = end - this.video.currentTime;
-                    this.video.playbackRate = gap > 0.1 ? gap : 0.1;
+                    this.video.playbackRate = gap > 1.5 ? 1.5 : 1; /* dogness: no slow-mo */
                     // console.debug('VideoRTC.buffered', gap, this.video.playbackRate, this.video.readyState);
                 }
             });
