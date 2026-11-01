@@ -52,6 +52,13 @@ HOST_IP="$(ip addr 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' \
 cat > /etc/go2rtc.yaml <<EOF
 api:
   listen: ":1984"
+  # Allow the bundled Lovelace card to connect. The card is served by the HA
+  # frontend (port 8123) but talks directly to go2rtc here (port 1984), so the
+  # browser's WebSocket is cross-origin. go2rtc's default same-origin check
+  # rejects it because it strips the port from the Origin but not from Host
+  # (homeassistant.local != homeassistant.local:1984), so the card could never
+  # connect. "*" permits any origin (safe: this port is only on the LAN).
+  origin: "*"
 rtsp:
   listen: ":8554"
 webrtc:
