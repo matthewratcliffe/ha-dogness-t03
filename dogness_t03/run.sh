@@ -61,6 +61,8 @@ EOF
 [ -n "${HOST_IP}" ] && echo "    - \"${HOST_IP}:8555\"" >> /etc/go2rtc.yaml
 echo "    - stun:8555" >> /etc/go2rtc.yaml
 cat >> /etc/go2rtc.yaml <<EOF
+ffmpeg:
+  dogcam: "-c:v libx264 -g 30 -r 15 -preset ultrafast -tune zerolatency -bf 0"
 log:
   level: ${LOG_LEVEL}
 dogness:
