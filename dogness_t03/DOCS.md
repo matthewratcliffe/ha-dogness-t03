@@ -38,26 +38,25 @@ The add-on ships a self-contained Lovelace card that plays the go2rtc stream **d
 browser/app** (MSE/WebRTC, no iframe, no HACS). It renders inline so it works in the Home
 Assistant mobile app, where iframe/Webpage cards do not.
 
-On start the add-on copies `dogness-card.js` into your HA `www` folder. To use it (one-time):
+**It sets itself up.** On start the add-on:
+1. copies `dogness-card.js` into HA's `www` folder, and
+2. auto-registers it as a frontend resource via HA's API.
 
-1. **Settings → Dashboards → ⋮ (top-right) → Resources → + Add resource**
-   - URL: `/local/dogness-card.js`
-   - Type: **JavaScript Module**
-   - (Then refresh the page, or restart HA.)
-2. Add a **Manual** card:
+So you don't add a resource or write any YAML. Just add the card from the UI:
 
-   ```yaml
-   type: custom:dogness-live
-   url: "http://<HA_IP>:1984/api/ws?src=treater"   # <HA_IP> = your HA box's LAN IP
-   mode: "mse,webrtc"
-   ```
+- Edit a dashboard → **+ Add Card** → scroll to **"Dogness Live"** in the card picker → add it.
+  It works with **no configuration** (the host is auto-detected from how you're viewing HA).
 
-   Replace `<HA_IP>` with your Home Assistant host's LAN IP (e.g. `192.168.1.50`). `mode`
-   prefers MSE (most reliable on mobile) and falls back to WebRTC.
+That's it — a smooth live widget alongside the snapshot `camera.dog_treater` and `button.treat`.
 
-> Works when you open HA over **http** on the LAN. If you open HA over **https** (e.g. Nabu
-> Casa), the browser blocks the `ws://` connection to the add-on (mixed content) — in that case
-> use the snapshot camera on mobile, or put go2rtc behind an https reverse proxy.
+> **Requirements / caveats**
+> - Auto-registration needs dashboards in the default (storage) mode. If the card isn't in the
+>   picker, check the add-on log; you can also add it by hand: **Settings → Dashboards → ⋮ →
+>   Resources → + Add** `/local/dogness-card.js` (type **JavaScript Module**), then refresh.
+> - Works when you open HA over **http** on the LAN. Over **https** (e.g. Nabu Casa) the browser
+>   blocks the `ws://` connection to the add-on (mixed content) — on mobile use the snapshot
+>   camera instead, or front go2rtc with an https reverse proxy.
+> - To point at a non-default stream, edit the card and set `src: <stream name>`.
 
 MQTT topics used: `homeassistant/button/dogness_<stream>/config`,
 `homeassistant/camera/dogness_<stream>/config`, command `dogness/<stream>/treat/set`,

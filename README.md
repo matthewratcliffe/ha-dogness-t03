@@ -133,21 +133,18 @@ The MQTT camera is snapshot-based. For **smooth, full-rate live video** — incl
 self-contained Lovelace card (`dogness-live`). It plays the go2rtc stream **directly from your
 browser/app** (MSE/WebRTC), so it needs no HACS, no WebRTC integration, and no iframe.
 
-On start, the add-on copies `dogness-card.js` into your HA `www` folder. One-time setup:
+**It sets itself up** — on start the add-on copies `dogness-card.js` into HA's `www` folder
+*and* auto-registers it as a frontend resource (via HA's API). No YAML, no resource step.
 
-1. **Settings → Dashboards → ⋮ → Resources → + Add resource**
-   - URL `/local/dogness-card.js`, Type **JavaScript Module**. Refresh the page afterwards.
-2. Add a **Manual** card:
+Just add it from the UI: edit a dashboard → **+ Add Card** → pick **"Dogness Live"** from the
+card gallery. It needs **no configuration** (the host is auto-detected from how you're viewing
+HA). It sits alongside the snapshot `camera.dog_treater` and `button.treat`.
 
-   ```yaml
-   type: custom:dogness-live
-   url: "http://HA_IP:1984/api/ws?src=treater"   # HA_IP = your HA host's LAN IP
-   mode: "mse,webrtc"
-   ```
-
-> This works when you open HA over **http** on your LAN. Over **https** (e.g. Nabu Casa) the
-> browser blocks the `ws://` connection (mixed content) — use the snapshot camera on mobile in
-> that case, or front go2rtc with an https reverse proxy.
+> - Auto-registration needs default (storage-mode) dashboards. If the card isn't in the picker,
+>   add it by hand once: **Settings → Dashboards → ⋮ → Resources → + Add** `/local/dogness-card.js`
+>   (type **JavaScript Module**), then refresh.
+> - Works over **http** on the LAN. Over **https** (Nabu Casa) the browser blocks the `ws://`
+>   to the add-on (mixed content) — use the snapshot camera on mobile there.
 
 ---
 

@@ -844,7 +844,9 @@ class DognessLiveCard extends HTMLElement {
     }
 
     getCardSize() { return 4; }
-    static getStubConfig() { return { url: 'http://HA_IP:1984/api/ws?src=treater', mode: 'mse,webrtc' }; }
+    // Zero-config: picked from the card gallery it works with no fields — the
+    // host is auto-detected from how you're viewing HA (location.hostname).
+    static getStubConfig() { return { src: 'treater', mode: 'mse,webrtc' }; }
 }
 
 if (!customElements.get('dogness-live')) {
