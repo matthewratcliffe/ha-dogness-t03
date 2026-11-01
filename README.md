@@ -32,8 +32,13 @@ add-on you can drop onto a dashboard.
 
 ### 1. Add this repository
 
-In Home Assistant: **Settings → Add-ons → Add-on Store → ⋮ (top-right) → Repositories**,
-paste:
+**One click** (recommended) — opens the *Add repository* dialog on your HA instance with the
+URL pre-filled:
+
+[![Add repository to your Home Assistant instance.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmatthewratcliffe%2Fha-dogness-t03)
+
+**Or add it manually:** in Home Assistant go to **Settings → Add-ons → Add-on Store →
+⋮ (top-right) → Repositories**, paste:
 
 ```
 https://github.com/matthewratcliffe/ha-dogness-t03
