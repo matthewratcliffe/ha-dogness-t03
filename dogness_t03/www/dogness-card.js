@@ -829,8 +829,14 @@ class DognessLiveCard extends HTMLElement {
             this.appendChild(this._stream);
         }
 
-        // Prefer MSE (works where WebRTC's UDP media port may be blocked).
-        this._stream.mode = config.mode || 'mse,webrtc,hls,mjpeg';
+        // Prefer RELIABLE (TCP) transports: MSE (Android/desktop) then HLS
+        // (iOS, which has no MSE). WebRTC is UDP and this cheap feeder loses
+        // P-frames over it, which collapses playback to keyframes only
+        // (~1 frame every few seconds). Keep WebRTC only as a last resort.
+        // (Auto-upgrade the old 'mse,webrtc' default saved by earlier cards.)
+        let mode = config.mode;
+        if (!mode || mode === 'mse,webrtc') mode = 'mse,hls,webrtc';
+        this._stream.mode = mode;
         this._stream.background = config.background === true;
         if (config.muted !== false && this._stream.video) this._stream.video.muted = true;
 
@@ -845,8 +851,9 @@ class DognessLiveCard extends HTMLElement {
 
     getCardSize() { return 4; }
     // Zero-config: picked from the card gallery it works with no fields — the
-    // host is auto-detected from how you're viewing HA (location.hostname).
-    static getStubConfig() { return { src: 'treater', mode: 'mse,webrtc' }; }
+    // host is auto-detected from how you're viewing HA (location.hostname),
+    // and the reliable default transport order is used.
+    static getStubConfig() { return { src: 'treater' }; }
 }
 
 if (!customElements.get('dogness-live')) {

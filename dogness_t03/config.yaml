@@ -1,5 +1,5 @@
 name: Dogness Treater (T03)
-version: "1.2.1"
+version: "1.2.2"
 slug: dogness_t03
 description: Live camera feed + treat dispensing for Dogness TUTK cameras (Smart Cam Treater T03 / T1020). Pure Go, LAN-direct, no cloud streaming.
 url: "https://github.com/matthewratcliffe/ha-dogness-t03"
