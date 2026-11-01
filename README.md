@@ -190,6 +190,89 @@ the cloud provisioning API, LAN discovery, and a security analysis.
 
 ---
 
+## Project structure
+
+This repo is a **custom Home Assistant add-on repository** with a single add-on in
+`dogness_t03/`. The interesting code is a small set of Go files added to
+[go2rtc](https://github.com/AlexxIT/go2rtc) — the repo does **not** vendor the whole go2rtc
+tree. Instead, `dogness_t03/overlay/` holds only the files that are **new or changed** versus
+upstream go2rtc; the build clones upstream at a pinned commit and lays the overlay on top, so
+every path under `overlay/` mirrors its position in the go2rtc source tree.
+
+```
+ha-dogness-t03/
+├── repository.yaml                 # add-on repository descriptor (name/url/maintainer)
+├── scripts/
+│   └── build.sh                    # rebuild the go2rtc binaries from source
+├── README.md · RESEARCH.md         # this file, and the reverse-engineering report
+└── dogness_t03/                    # the add-on itself
+    ├── config.yaml                 # manifest: version, options/schema, host_network, maps
+    ├── build.yaml                  # per-arch base images
+    ├── Dockerfile                  # copies the prebuilt binary + card + run.sh; apk adds ffmpeg etc.
+    ├── run.sh                      # entrypoint: renders go2rtc.yaml, starts go2rtc, does MQTT discovery
+    ├── icon.png · logo.png         # Add-on Store artwork
+    ├── translations/en.yaml        # option labels shown in the UI
+    ├── DOCS.md                     # the add-on's Documentation tab
+    ├── bin/                        # prebuilt static go2rtc binaries (aarch64 · amd64 · armv7)
+    ├── www/
+    │   └── dogness-card.js         # bundled self-contained Lovelace card (go2rtc player + wrapper)
+    └── overlay/                    # ← the Go source added to go2rtc
+        ├── main.go                 # wires the dogness module into go2rtc startup
+        ├── internal/dogness/
+        │   ├── dogness.go          # module: cloud login → list devices → register a stream per
+        │   │                       #   feeder (optional ffmpeg transcode) + POST /api/dogness/feed
+        │   └── resource.go         # auto-registers the Lovelace card via HA's WebSocket API
+        ├── pkg/dogness/
+        │   ├── cloud.go            # Dogness cloud API: salted-MD5 login + device list (UID + key)
+        │   ├── discover.go         # LAN broadcast discovery (find the feeder's IP from its UID)
+        │   └── producer.go         # go2rtc Producer: TUTK session, IOCtrl 511, H.264 with real-time
+        │                           #   frame pacing, and Feed() = treat IOCtrl 8318
+        └── pkg/tutk/
+            ├── conn.go             # patched for the T03 dialect (0x1B magic, SDK-version bytes, size)
+            └── session0.go         # patched handshake / IPv4 / read-deadline / discovery
+```
+
+Two things get built, independently:
+
+- **The go2rtc binary** (Go) — the pure-Go streaming engine with the `dogness://` source and treat
+  API compiled in. Prebuilt binaries are committed in `bin/`; rebuild them with `scripts/build.sh`.
+- **The add-on image** (Docker) — built by the Home Assistant Supervisor from the `Dockerfile`. It
+  only *copies* the prebuilt binary, the card, and `run.sh`, and `apk add`s `ffmpeg`,
+  `mosquitto-clients`, and `curl`. There's no on-device Go compile, so it installs in seconds.
+
+## Building from source
+
+### Rebuild the go2rtc binaries
+
+Requires **git** and the **Go toolchain** (≥ the version in go2rtc's `go.mod`). From the repo root:
+
+```bash
+./scripts/build.sh
+```
+
+It clones upstream go2rtc at the pinned commit
+(`7c05066c90ab6ad1fccb506d5f0408aa31ebe60f`, v1.9.15), copies `dogness_t03/overlay/` over it, and
+cross-compiles **static, CGO-disabled** binaries (`-trimpath -ldflags "-s -w"`) for `linux/arm64`,
+`linux/arm` (v7) and `linux/amd64` into `dogness_t03/bin/`. Pure Go, no native vendor libraries.
+
+> To change the go2rtc base version, edit `GO2RTC_REF` in `scripts/build.sh` (and re-test — the
+> `pkg/tutk` patches in `overlay/` are written against that commit).
+
+### Build / install the add-on
+
+You don't normally build the image yourself — install the add-on from the Add-on Store ([Install](#install)
+above) and the Supervisor builds it. For local add-on development, point the Add-on Store at a
+checkout (or your fork) as a repository, edit files under `dogness_t03/`, and use **Rebuild** on the
+add-on's ⋮ menu to pick up changes. After editing anything under `overlay/`, run `scripts/build.sh`
+first so the new binary is in `bin/` before you Rebuild.
+
+### The Lovelace card
+
+`www/dogness-card.js` is committed prebuilt — it bundles go2rtc's `video-rtc.js` + `video-stream.js`
+web components with a thin card wrapper (`custom:dogness-live`). `run.sh` copies it into
+`<config>/www` at startup and the Go module registers it as a dashboard resource, so there's no
+separate card build or install step.
+
 ## Privacy & credentials
 
 Your Dogness email/password are stored only in this add-on's options on **your** Home
