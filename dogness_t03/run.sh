@@ -6,9 +6,11 @@ TZCFG="$(bashio::config 'timezone')"
 STREAM="$(bashio::config 'stream')"
 LOG_LEVEL="$(bashio::config 'log_level')"
 MQTT_CAMERA="$(bashio::config 'mqtt_camera')"
+TRANSCODE="$(bashio::config 'transcode')"
 
 [ -z "${LOG_LEVEL}" ] && LOG_LEVEL="info"
 [ -z "${STREAM}" ] && STREAM="treater"
+bashio::var.true "${TRANSCODE}" && TRANSCODE="true" || TRANSCODE="false"
 
 if [ -z "${USERNAME}" ] || [ -z "${PASSWORD}" ]; then
     bashio::log.fatal "Set your Dogness account 'username' and 'password' in the Configuration tab."
@@ -66,6 +68,7 @@ dogness:
   password: "${PASSWORD}"
   timezone: ${TZCFG}
   stream: "${STREAM}"
+  transcode: ${TRANSCODE}
 EOF
 
 # ---- start go2rtc (video + treat API) in the background ----
