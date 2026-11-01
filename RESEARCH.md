@@ -61,6 +61,10 @@ app or cloud media relay**, in a form that installs cleanly into Home Assistant 
   hard-code the device's IP address.
 - A clean-room, **pure-Go** implementation (no vendor `.so`) packaged as a Home Assistant
   add-on, and its end-to-end validation against hardware.
+- A **browser-side live-video delivery** design that works around a platform constraint
+  chain — host networking is mandatory, which firewalls Home Assistant Core from the add-on —
+  via a self-contained Lovelace card, frame-timestamp pacing, a constant-rate transcode, and a
+  cross-origin WebSocket fix, yielding smooth real-time video on the dashboard and mobile app.
 
 ### 1.3 Scope and ethics
 
@@ -476,6 +480,83 @@ password** (plus an optional timezone and stream name); UID, AV key, and IP are 
 automatically. A start-up script renders the go2rtc configuration from the add-on options and
 `exec`s the server.
 
+### 7.4 Delivering live video to the dashboard
+
+Recovering the protocol and ingesting the stream into go2rtc is only half of a usable
+integration; the video must also reach a Home Assistant **dashboard**, including the mobile
+app. This proved to be a second, independent engineering problem, driven by a chain of
+platform constraints.
+
+**Host networking is mandatory, which firewalls Home Assistant Core from the stream.** The
+LAN discovery of §5.9 requires L2 broadcast, and — decisively — the feeder answers each
+session from a **random high ephemeral port**, which a bridged-NAT container cannot predict
+or traverse; the handshake only completes with **host networking**. Home Assistant OS,
+however, firewalls host-network add-on ports *from Core itself*. The practical consequence is
+that every Core-mediated consumer — the **Generic Camera** integration (`rtsp://…:8554`,
+`http://…:1984/api/frame.jpeg`) and the **WebRTC** camera integration — **cannot reach the
+add-on** and times out, regardless of address used (host IP or the Supervisor gateway
+`172.30.32.1`). Only two paths cross the boundary: an MQTT broker (observed via §7.5) and the
+**user's browser**, which can contact the host-network add-on directly. Live video delivery
+was therefore designed as a **browser-side** concern.
+
+**A self-contained Lovelace card.** The add-on ships a single JavaScript card
+(`custom:dogness-live`) that bundles go2rtc's own `VideoRTC`/`VideoStream` web components plus
+a thin Home Assistant card wrapper. It connects **directly from the browser to the add-on's
+go2rtc** over a WebSocket and plays via **MSE** (desktop/Android), **HLS** (iOS, which lacks
+MSE), or **WebRTC** as a fallback — with no `<iframe>` (the HA mobile app does not render
+iframe/Webpage cards), no HACS, and no Core involvement. The add-on installs the card into
+`<config>/www` and auto-registers it as a Lovelace resource via HA's WebSocket API, so it
+appears in the card picker with no manual resource step; the host is auto-detected from
+`location.hostname`, making the card zero-configuration.
+
+**Frame pacing.** The producer initially emitted each H.264 access unit with an empty RTP
+timestamp, so downstream MSE could not pace playback and crammed thousands of frames into
+seconds (measured playback rate ≈ 0.015×). The fix uses the device's own presentation clock:
+for this device, go2rtc's session-25 reassembly surfaces a 32-byte trailer that is in fact
+`[16 bytes of H.264 tail][16-byte FrameInfo]`, and a **millisecond presentation timestamp**
+lives at trailer offset 28 (little-endian). Re-attaching the 16 tail bytes (which fixes
+decode corruption) and setting the RTP timestamp to `(ms − base) × 90` (90 kHz) yields
+real-time pacing.
+
+**Transcoding to a constant frame rate.** Even correctly paced, the raw feeder stream is
+jittery (frame intervals varying ~46–92 ms) and occasionally lossy, which destabilises
+browser players (MSE `SourceBuffer` errors; aggressive live-sync that alternately slow-motions
+and jumps). The add-on therefore offers an in-container **transcode** (default on): an
+`ffmpeg` instance reads the add-on's *own* working HTTP endpoint
+(`/api/stream.mp4` — go2rtc's RTSP path is unreliable for this device) and re-encodes to a
+clean **constant 15 fps** H.264 with regular keyframes (`-g 30 -preset ultrafast -tune
+zerolatency`). The clean stream is what the card consumes. Because keyframes now recur
+predictably, playback is smooth **even over WebRTC/UDP**, where sporadic P-frame loss had
+previously collapsed the picture to keyframe-only updates (~one update every few seconds).
+
+**A cross-origin WebSocket rejection (the final blocker).** With the above in place the card
+still failed to connect, for a reason unrelated to the feeder: the card is served by the HA
+frontend on port **8123**, but it opens its WebSocket to go2rtc on port **1984**, so the
+browser treats the connection as **cross-origin**. go2rtc's default WebSocket origin check
+strips the port from the `Origin` header but compares it against the request `Host` *with* its
+port, so `homeassistant.local` never equals `homeassistant.local:1984` and **every** card
+connection was refused:
+
+```
+ws.go > host=homeassistant.local:1984 origin=http://homeassistant.local:8123
+error="websocket: request origin not allowed by Upgrader.CheckOrigin"
+```
+
+go2rtc exposes only two settings for this (`api.origin`: empty = same-origin, or `"*"` = any);
+the add-on sets **`api.origin: "*"`**, which is safe because port 1984 is reachable only on the
+LAN under host networking. This single configuration change is what allows the card to connect
+at all; it is the difference between the live card never working and working.
+
+### 7.5 Ready-made entities over MQTT
+
+For users who prefer native entities, the start-up script also publishes **MQTT discovery**
+messages (when a broker is available), yielding a `button` that dispenses a treat (its command
+topic triggers `POST /api/dogness/feed`) and a snapshot `camera` fed by periodically
+publishing fresh JPEG frames pulled from go2rtc's `/api/frame.jpeg`. MQTT is the one
+Core-reachable path across the host-networking boundary (§7.4), so it provides a glanceable,
+universally-rendering camera tile (including on iOS and in automations) that complements the
+full-rate `dogness-live` card.
+
 ---
 
 ## 8. Validation
@@ -495,6 +576,14 @@ The integration was validated against the physical device:
   with no UID, key, or IP configured.
 - **Reproducible build.** Building from a *pristine* upstream checkout plus the published
   overlay produced a working static binary, confirming the add-on's build path.
+- **Live dashboard video (end-to-end).** On a running Home Assistant OS instance, the
+  `dogness-live` card was added to a dashboard from the card picker and played the live feeder
+  stream in the browser. Instrumenting the card's `<video>` element showed a 1280×720 picture
+  at `readyState 4` whose `currentTime` advanced **1.000 s per 1 s of wall-clock** at
+  `playbackRate 1` — i.e. real-time, with no stalls or multi-second jumps — over both MSE and
+  WebRTC transports. Before the `api.origin` fix of §7.4 the same card's WebSocket was refused
+  at the server (logged origin rejection) and no video started; after it, the connection
+  succeeded. The snapshot MQTT camera (§7.5) rendered in parallel as the glanceable fallback.
 
 ---
 
@@ -536,6 +625,13 @@ depends on no cloud media path.
   dialect and firmware V1.0.0; other Dogness models or future firmware may differ.
 - **Discovery requires L2 reachability.** Segmented VLANs that block broadcast between Home
   Assistant and the feeder would require an explicit address or a discovery relay.
+- **Live card transport caveats.** The browser-side card (§7.4) talks plain `ws://` to the
+  add-on, so it requires Home Assistant to be opened over **http on the LAN**; over **https**
+  (e.g. Nabu Casa) the browser blocks the connection as mixed content, and the MQTT snapshot
+  camera is the fallback. iOS has no MSE and so uses HLS (a few seconds of latency). The
+  constant-rate transcode adds encoder load on low-power hosts (≈ 35–55 % of one core for
+  720p15 `libx264 ultrafast` on a Raspberry Pi), and can be disabled to pass the raw stream
+  through.
 
 ---
 

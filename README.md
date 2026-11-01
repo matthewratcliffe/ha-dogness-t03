@@ -57,6 +57,7 @@ On the **Configuration** tab:
 | `timezone` | your UTC offset in hours (e.g. `11` for Sydney, `-5` for New York). `0` = auto-detect |
 | `stream` | camera stream name, default `treater` |
 | `mqtt_camera` | publish the snapshot camera over MQTT (default on) |
+| `transcode` | re-encode the feeder's stream to a clean, constant-rate 15 fps H.264 for smooth live playback (default on; set `false` to pass the raw stream through and save CPU) |
 
 > For the **ready-made entities** below, also install the **Mosquitto broker** add-on (and the
 > **MQTT** integration). Without MQTT the add-on still serves video + the treat API; you just
@@ -131,7 +132,8 @@ put on a dashboard.
 The MQTT camera is snapshot-based. For **smooth, full-rate live video** — including inside the
 **Home Assistant mobile app**, where iframe/Webpage cards don't render — the add-on ships a
 self-contained Lovelace card (`dogness-live`). It plays the go2rtc stream **directly from your
-browser/app** (MSE/WebRTC), so it needs no HACS, no WebRTC integration, and no iframe.
+browser/app** (MSE on desktop/Android, HLS on iOS, WebRTC as a fallback), so it needs no HACS,
+no WebRTC integration, and no iframe. Verified end-to-end: clean 1280×720 at real-time 1.0×.
 
 **It sets itself up** — on start the add-on copies `dogness-card.js` into HA's `www` folder
 *and* auto-registers it as a frontend resource (via HA's API). No YAML, no resource step.
@@ -140,11 +142,21 @@ Just add it from the UI: edit a dashboard → **+ Add Card** → pick **"Dogness
 card gallery. It needs **no configuration** (the host is auto-detected from how you're viewing
 HA). It sits alongside the snapshot `camera.dog_treater` and `button.treat`.
 
+> **Why a browser-side card and not a normal HA camera?** The add-on must use **host
+> networking** (the feeder answers from random high ports that bridged NAT breaks), and HA OS
+> firewalls Home Assistant Core away from a host-network add-on's ports. So Core — and anything
+> built on it (Generic Camera, the WebRTC integration) — simply **can't reach** the stream;
+> it always times out. The browser, however, *can* reach the add-on directly, which is exactly
+> what this card does.
+
 > - Auto-registration needs default (storage-mode) dashboards. If the card isn't in the picker,
 >   add it by hand once: **Settings → Dashboards → ⋮ → Resources → + Add** `/local/dogness-card.js`
 >   (type **JavaScript Module**), then refresh.
 > - Works over **http** on the LAN. Over **https** (Nabu Casa) the browser blocks the `ws://`
 >   to the add-on (mixed content) — use the snapshot camera on mobile there.
+> - If the card stays black on `http`, hard-refresh the page. The add-on sets go2rtc's
+>   `api.origin: "*"` so the card (served on HA's `:8123`) is allowed to open its WebSocket to
+>   go2rtc on `:1984`; without it go2rtc's same-origin check rejects the cross-port connection.
 
 ---
 
