@@ -25,6 +25,13 @@ fi
 
 bashio::log.info "Dogness Treater starting (tz=${TZCFG}, stream=${STREAM})"
 
+# Detect the host's real LAN IP (we run with host networking) so WebRTC
+# advertises a candidate phones/other clients can actually reach, instead of
+# only the unreachable Docker (172.x) addresses that break mobile playback.
+HOST_IP="$(ip addr 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' \
+    | grep -vE '^(127\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' | head -1)"
+[ -n "${HOST_IP}" ] && bashio::log.info "WebRTC LAN candidate: ${HOST_IP}:8555"
+
 cat > /etc/go2rtc.yaml <<EOF
 api:
   listen: ":1984"
@@ -32,6 +39,11 @@ rtsp:
   listen: ":8554"
 webrtc:
   listen: ":8555"
+  candidates:
+EOF
+[ -n "${HOST_IP}" ] && echo "    - \"${HOST_IP}:8555\"" >> /etc/go2rtc.yaml
+echo "    - stun:8555" >> /etc/go2rtc.yaml
+cat >> /etc/go2rtc.yaml <<EOF
 log:
   level: ${LOG_LEVEL}
 dogness:
