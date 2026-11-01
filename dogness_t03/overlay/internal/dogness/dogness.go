@@ -18,10 +18,11 @@ import (
 
 // Config is the `dogness:` section of go2rtc.yaml.
 type Config struct {
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	Timezone int    `yaml:"timezone"`
-	Stream   string `yaml:"stream"` // optional name for a single feeder
+	Username  string `yaml:"username"`
+	Password  string `yaml:"password"`
+	Timezone  int    `yaml:"timezone"`
+	Stream    string `yaml:"stream"`    // optional name for a single feeder
+	Transcode bool   `yaml:"transcode"` // re-encode to a clean constant-rate stream
 }
 
 // entry is a resolved feeder, keyed by stream name, for the treat endpoint.
@@ -58,6 +59,10 @@ func Init() {
 	if cfg.Username != "" && cfg.Password != "" {
 		go setup()
 	}
+
+	// Best-effort: auto-register the bundled Lovelace card as a frontend
+	// resource so users don't have to add it manually.
+	go registerCard()
 }
 
 // setup logs into the Dogness cloud, lists the account's feeders and
@@ -110,7 +115,26 @@ func trySetup() error {
 		q.Set("password", d.Password)
 		src := "dogness://discover?" + q.Encode()
 
-		if _, err := streams.New(name, src); err != nil {
+		if cfg.Transcode {
+			// The raw feeder stream is jittery (variable frame timing) and has
+			// occasional packet-loss corruption, which makes browser players
+			// stutter / slow-mo / jump. Re-encode it to a clean constant-rate
+			// H.264 stream in-add-on: ffmpeg reads our own working HTTP MP4
+			// endpoint (go2rtc's RTSP is unreliable for this device) and emits
+			// CFR 15 fps with regular keyframes (via the "dogcam" ffmpeg
+			// template defined in go2rtc.yaml — the source string must stay
+			// space-free). The camera stream users see (`name`) is the clean
+			// one; the raw source is `name+"_src"`.
+			rawName := name + "_src"
+			_, _ = streams.New(rawName, src)
+			tc := "ffmpeg:http://127.0.0.1:1984/api/stream.mp4?src=" + rawName + "#video=dogcam"
+			if _, err := streams.New(name, tc); err != nil {
+				log.Warn().Err(err).Msgf("transcode register failed for %q; using raw stream", name)
+				_, _ = streams.New(name, src)
+			} else {
+				log.Info().Msgf("transcoding %q -> %q (clean 15fps)", rawName, name)
+			}
+		} else if _, err := streams.New(name, src); err != nil {
 			log.Warn().Err(err).Msgf("register stream %q", name)
 			continue
 		}

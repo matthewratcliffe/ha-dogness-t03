@@ -12,6 +12,7 @@
 package dogness
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net/url"
 	"sync"
@@ -23,6 +24,38 @@ import (
 	"github.com/AlexxIT/go2rtc/pkg/tutk"
 	"github.com/pion/rtp"
 )
+
+// readFrame reads one video frame and its presentation timestamp.
+//
+// For this device the generic TUTK reassembly hands back a 32-byte "frame
+// info" trailer that is actually the last 16 bytes of the H.264 frame followed
+// by the real 16-byte FRAMEINFO. So we re-attach those 16 bytes to the frame
+// (fixes decode corruption) and read the timestamp from the FRAMEINFO. The
+// device timestamp is a monotonic millisecond counter at offset 12 of the
+// 16-byte FRAMEINFO (i.e. offset 28 of the 32-byte trailer).
+func (p *Producer) readFrame() (frame []byte, tsMS uint32, err error) {
+	fi, fd, err := p.conn.ReadPacket()
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(fi) >= 32 {
+		fd = append(fd, fi[:16]...)          // restore over-split H.264 tail
+		tsMS = binary.LittleEndian.Uint32(fi[28:]) // ms timestamp
+	} else if len(fi) >= 16 {
+		tsMS = binary.LittleEndian.Uint32(fi[len(fi)-4:])
+	}
+	return fd, tsMS, nil
+}
+
+// rtpTime converts the device's millisecond timestamp to a relative 90 kHz
+// RTP timestamp (H.264 clock), handling the first-frame baseline.
+func (p *Producer) rtpTime(tsMS uint32) uint32 {
+	if !p.tsInit {
+		p.tsInit = true
+		p.tsBase = tsMS
+	}
+	return (tsMS - p.tsBase) * 90 // 90000 Hz / 1000 ms
+}
 
 const (
 	// ctrlStart starts the video stream (IOTYPE_USER_IPCAM_START).
@@ -102,6 +135,10 @@ type Producer struct {
 	host     string
 	username string
 	password string
+
+	tsInit bool
+	tsBase uint32
+	seq    uint16
 }
 
 func NewProducer(rawURL string) (*Producer, error) {
@@ -178,7 +215,7 @@ func (p *Producer) probe() ([]*core.Media, error) {
 
 	var vcodec *core.Codec
 	for vcodec == nil {
-		_, frameData, err := p.conn.ReadPacket()
+		frameData, _, err := p.readFrame()
 		if err != nil {
 			return nil, fmt.Errorf("dogness: probe: %w", err)
 		}
@@ -207,7 +244,7 @@ func (p *Producer) Start() error {
 	for {
 		_ = p.conn.SetDeadline(time.Now().Add(core.ConnDeadline))
 
-		_, frameData, err := p.conn.ReadPacket()
+		frameData, tsMS, err := p.readFrame()
 		if err != nil {
 			return err
 		}
@@ -216,9 +253,15 @@ func (p *Producer) Start() error {
 		}
 
 		pkt := &core.Packet{
-			Header:  rtp.Header{},
+			Header: rtp.Header{
+				Version:        2,
+				Marker:         true,
+				SequenceNumber: p.seq,
+				Timestamp:      p.rtpTime(tsMS),
+			},
 			Payload: annexb.EncodeToAVCC(frameData),
 		}
+		p.seq++
 
 		for _, recv := range p.Receivers {
 			if recv.Codec.Name == core.CodecH264 {
